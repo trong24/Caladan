@@ -1,3 +1,5 @@
+# Build metrics and probe Docker images and push to GHCR (ghcr.io)
+# Runs only when app/ changes; builds only images whose folder changed (matrix).
 name: Build and push to GHCR
 
 on:
@@ -10,8 +12,56 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-probe:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      metrics: ${{ steps.outputs.outputs.metrics }}
+      probe: ${{ steps.outputs.outputs.probe }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set outputs (manual run)
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "metrics=true" >> $GITHUB_OUTPUT
+          echo "probe=true" >> $GITHUB_OUTPUT
+
+      - name: Detect changed paths
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            metrics: app/metrics/**
+            probe: app/probe/**
+
+      - name: Set job outputs
+        id: outputs
+        run: |
+          echo "metrics=${{ steps.manual.outputs.metrics || steps.filter.outputs.metrics || 'false' }}" >> $GITHUB_OUTPUT
+          echo "probe=${{ steps.manual.outputs.probe || steps.filter.outputs.probe || 'false' }}" >> $GITHUB_OUTPUT
+
+  build:
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: metrics
+            context: ./app/metrics
+            dockerfile: ./app/metrics/Dockerfile
+            name: latency-monitor
+          - image: probe
+            context: ./app/probe
+            dockerfile: ./app/probe/Dockerfile
+            name: probe-server
+    # Only run this job for matrix entries whose folder changed (or both on manual)
+    if: (matrix.image == 'metrics' && needs.changes.outputs.metrics == 'true') || (matrix.image == 'probe' && needs.changes.outputs.probe == 'true')
     permissions:
       contents: read
       packages: write
@@ -29,20 +79,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (probe)
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/probe-server
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=sha,prefix=
 
-      - name: Build and push probe-server
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ./app/probe
-          file: ./app/probe/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
