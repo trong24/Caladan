@@ -1,5 +1,3 @@
-# Build metrics and probe Docker images and push to GHCR (ghcr.io)
-# Runs only when app/ changes; builds only images whose folder changed (matrix).
 name: Build and push to GHCR
 
 on:
@@ -17,6 +15,7 @@ jobs:
     outputs:
       metrics: ${{ steps.outputs.outputs.metrics }}
       probe: ${{ steps.outputs.outputs.probe }}
+      build_matrix: ${{ steps.matrix.outputs.build_matrix }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,23 +44,29 @@ jobs:
           echo "metrics=${{ steps.manual.outputs.metrics || steps.filter.outputs.metrics || 'false' }}" >> $GITHUB_OUTPUT
           echo "probe=${{ steps.manual.outputs.probe || steps.filter.outputs.probe || 'false' }}" >> $GITHUB_OUTPUT
 
+      - name: Set build matrix
+        id: matrix
+        run: |
+          m="${{ steps.outputs.outputs.metrics }}"
+          p="${{ steps.outputs.outputs.probe }}"
+          if [ "$m" = "true" ] && [ "$p" = "true" ]; then
+            echo 'build_matrix=[{"image":"metrics","context":"./app/metrics","dockerfile":"./app/metrics/Dockerfile","name":"metrics"},{"image":"probe","context":"./app/probe","dockerfile":"./app/probe/Dockerfile","name":"probe"}]' >> $GITHUB_OUTPUT
+          elif [ "$m" = "true" ]; then
+            echo 'build_matrix=[{"image":"metrics","context":"./app/metrics","dockerfile":"./app/metrics/Dockerfile","name":"metrics"}]' >> $GITHUB_OUTPUT
+          elif [ "$p" = "true" ]; then
+            echo 'build_matrix=[{"image":"probe","context":"./app/probe","dockerfile":"./app/probe/Dockerfile","name":"probe"}]' >> $GITHUB_OUTPUT
+          else
+            echo 'build_matrix=[]' >> $GITHUB_OUTPUT
+          fi
+
   build:
     needs: changes
+    if: needs.changes.outputs.build_matrix != '[]'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - image: metrics
-            context: ./app/metrics
-            dockerfile: ./app/metrics/Dockerfile
-            name: latency-monitor
-          - image: probe
-            context: ./app/probe
-            dockerfile: ./app/probe/Dockerfile
-            name: probe-server
-    # Only run this job for matrix entries whose folder changed (or both on manual)
-    if: (matrix.image == 'metrics' && needs.changes.outputs.metrics == 'true') || (matrix.image == 'probe' && needs.changes.outputs.probe == 'true')
+        include: ${{ fromJson(needs.changes.outputs.build_matrix) }}
     permissions:
       contents: read
       packages: write
