@@ -5,3 +5,11 @@ env/
 __pycache__/
 *.py[cod]
 *.pyo
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+crash.*.log
+backend.tf
