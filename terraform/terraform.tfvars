@@ -1,0 +1,5 @@
+project_id         = "caladan-488808"
+region             = "asia-southeast1"
+zone               = "asia-southeast1-a"
+metrics_image      = "ghcr.io/trong24/metrics:e2b8503"
+probe_server_image = "ghcr.io/trong24/probe:e2b8503"

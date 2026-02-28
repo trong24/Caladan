@@ -1,0 +1,10 @@
+# Copy to backend.tf and replace YOUR_PROJECT_ID with your GCP project ID.
+# Then run: terraform init -migrate-state
+# (Use after first apply with local state so the bucket exists.)
+
+terraform {
+  backend "gcs" {
+    bucket = "YOUR_PROJECT_ID-tfstate"
+    prefix = "terraform/state"
+  }
+}
