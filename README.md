@@ -51,30 +51,6 @@ Both instances use **Container-Optimized OS**; the app is packaged as a **Docker
      gcloud compute ssh caladan-metrics --zone=asia-southeast1-a --project=caladan-488808 --tunnel-through-iap"
      gcloud compute ssh caladan-probe --zone=asia-southeast1-a --project=caladan-488808 --tunnel-through-iap"
      ```
-   - **Metrics**: Start an IAP TCP tunnel, then curl locally:
-     ```bash
-     gcloud compute start-iap-tunnel caladan-metrics 8080 --local-host-port=localhost:8080 --zone=asia-southeast1-a --project=caladan-488808
-     WARNING:
-
-     To increase the performance of the tunnel, consider installing NumPy. For instructions,
-     please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
-
-     Testing if tunnel connection works.
-     Listening on port [8080].
-     # In another terminal:
-     curl 127.0.0.1:8080/metrics
-     # HELP latency_seconds HTTP round-trip latency to target
-     # TYPE latency_seconds gauge
-     latency_seconds 0.003545
-     # HELP latency_measurements_total Total number of measurements
-     # TYPE latency_measurements_total counter
-     latency_measurements_total 704
-     # HELP latency_last_success_timestamp_seconds Unix time of last successful measurement
-     # TYPE latency_last_success_timestamp_seconds gauge
-     latency_last_success_timestamp_seconds 1772285144
-     ```
-
-**IAP**: Ensure your user has the **IAP-secured Tunnel User** role (or `roles/iap.tunnelResourceAccessor`) on the project so `gcloud compute ssh --tunnel-through-iap` and `gcloud compute start-iap-tunnel` succeed.
 
 ## Technology Choices and Rationale
 
@@ -92,19 +68,30 @@ Both instances use **Container-Optimized OS**; the app is packaged as a **Docker
 - **URL**: Instances are private-only. Use IAP TCP tunnel: run `terraform output -raw iap_tunnel_metrics`, then `curl http://localhost:8080/metrics`.
 - **Port**: 8080 (configurable via app env; startup script sets it to 8080).
 
-**Example `curl http://localhost:8080/metrics` (after IAP tunnel):**
+   - **Metrics**: Start an IAP TCP tunnel, then curl locally:
+     ```bash
+     gcloud compute start-iap-tunnel caladan-metrics 8080 --local-host-port=localhost:8080 --zone=asia-southeast1-a --project=caladan-488808
+     WARNING:
 
-```text
-# HELP latency_seconds HTTP round-trip latency to probe
-# TYPE latency_seconds gauge
-latency_seconds 0.002345
-# HELP latency_measurements_total Total number of measurements
-# TYPE latency_measurements_total counter
-latency_measurements_total 42
-# HELP latency_last_success_timestamp_seconds Unix time of last successful measurement
-# TYPE latency_last_success_timestamp_seconds gauge
-latency_last_success_timestamp_seconds 1739123456
-```
+     To increase the performance of the tunnel, consider installing NumPy. For instructions,
+     please see https://cloud.google.com/iap/docs/using-tcp-forwarding#increasing_the_tcp_upload_bandwidth
+
+     Testing if tunnel connection works.
+     Listening on port [8080].
+     ```
+   - **In another terminal**:
+     ```
+     curl 127.0.0.1:8080/metrics
+     # HELP latency_seconds HTTP round-trip latency to target
+     # TYPE latency_seconds gauge
+     latency_seconds 0.003545
+     # HELP latency_measurements_total Total number of measurements
+     # TYPE latency_measurements_total counter
+     latency_measurements_total 704
+     # HELP latency_last_success_timestamp_seconds Unix time of last successful measurement
+     # TYPE latency_last_success_timestamp_seconds gauge
+     latency_last_success_timestamp_seconds 1772285144
+     ```
 
 - **`latency_seconds`**: Last measured HTTP round-trip time (seconds) from metrics to probe.
 - **`latency_measurements_total`**: Total number of probe attempts since the app started.
