@@ -161,9 +161,11 @@ resource "google_compute_instance" "metrics" {
   labels = local.common_labels
 
   metadata_startup_script = templatefile("${path.module}/startup/cos-metrics.sh.tpl", {
-    probe_host    = google_compute_instance.probe.network_interface[0].network_ip
-    probe_port    = "8081"
-    metrics_image = local.metrics_image
+    probe_host       = google_compute_instance.probe.network_interface[0].network_ip
+    probe_port       = "8081"
+    metrics_image    = local.metrics_image
+    alloy_config     = file("${path.module}/startup/alloy-config.alloy.tpl")
+    grafana_pw_b64   = var.grafana_cloud_prometheus_password != "" ? base64encode(var.grafana_cloud_prometheus_password) : ""
   })
 
   allow_stopping_for_update = true
